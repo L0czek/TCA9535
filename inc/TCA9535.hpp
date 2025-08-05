@@ -1,7 +1,7 @@
 #ifndef TCA9535_HPP
 #define TCA9535_HPP
 
-#include "stm32f1xx_hal.h"
+#include "stm32g4xx_hal.h"
 #include <cstdint>
 #include <expected>
 #include <type_traits>
@@ -38,7 +38,8 @@ public:
     static constexpr uint8_t REG_CONFIG_0   = 0x06;
     static constexpr uint8_t REG_CONFIG_1   = 0x07;
 
-    TCA9535(I2C_HandleTypeDef* i2c_handle, uint8_t address_7bit);
+    // Factory-style configuration
+    static std::expected<TCA9535, HAL_StatusTypeDef> configure(I2C_HandleTypeDef* i2c_handle, uint8_t address_7bit);
 
     std::expected<void, HAL_StatusTypeDef> config_pin(Port port, Pin pin, Mode mode);
     std::expected<void, HAL_StatusTypeDef> write_pin(Port port, Pin pin, GPIO_PinState state);
@@ -47,29 +48,31 @@ public:
     std::expected<GPIO_PinState, HAL_StatusTypeDef> read_pin(Port port, Pin pin);
     std::expected<uint8_t, HAL_StatusTypeDef> read_port(Port port);
 
-    template<uint8_t REG, typename Func>
-    std::expected<void, HAL_StatusTypeDef> transact(Func&& func);
+    template<typename Func>
+    std::expected<void, HAL_StatusTypeDef> transact(uint8_t reg, Func&& func);
 
 private:
     I2C_HandleTypeDef* i2c;
     uint8_t address;
 
+    TCA9535(I2C_HandleTypeDef* i2c_handle, uint8_t address_7bit); // now private
+
     std::expected<uint8_t, HAL_StatusTypeDef> read_reg(uint8_t reg);
     std::expected<void, HAL_StatusTypeDef> write_reg(uint8_t reg, uint8_t value);
 };
 
-// Inline template implementation
-template<uint8_t REG, typename Func>
-std::expected<void, HAL_StatusTypeDef> TCA9535::transact(Func&& func) {
+// Inline transact implementation
+template<typename Func>
+std::expected<void, HAL_StatusTypeDef> TCA9535::transact(uint8_t reg, Func&& func) {
     static_assert(std::is_invocable_r_v<uint8_t, Func, uint8_t>,
-        "Func must be callable with uint8_t and return uint8_t");
+        "Func must take and return a uint8_t");
 
-    auto result = read_reg(REG);
-    if (!result)
-        return std::unexpected(result.error());
+    auto current = read_reg(reg);
+    if (!current)
+        return std::unexpected(current.error());
 
-    uint8_t updated = func(*result);
-    return write_reg(REG, updated);
+    uint8_t updated = func(*current);
+    return write_reg(reg, updated);
 }
 
 #endif // TCA9535_HPP

@@ -4,13 +4,23 @@ project(tca9535 CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(tca9535_cxx_file ${CMAKE_CURRENT_SOURCE_DIR}/src/TCA9535.cc)
+set(tca9535_hpp_file ${CMAKE_CURRENT_SOURCE_DIR}/inc/TCA9535.hpp)
+
 add_library(tca9535 STATIC
-    src/tca9535.cpp
+    ${tca9535_cxx_file}
 )
 
-target_include_directories(tca9535 PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
-    $<INSTALL_INTERFACE:include>
+function(replace_in_file filepath pattern replacement)
+    file(READ "${filepath}" file_content)
+    string(REPLACE "${pattern}" "${replacement}" new_content "${file_content}")
+    file(WRITE "${filepath}" "${new_content}")
+endfunction()
+
+replace_in_file(${tca9535_hpp_file} "stm32f1x" "${chip_family}")
+
+target_include_directories(tca9535 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc
 )
 
 # Export and install
